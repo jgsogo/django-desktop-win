@@ -30,6 +30,13 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
 Source: "./deploy/*"; DestDir: "{app}/bin"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "./django/testapp/*"; DestDir: "{app}/testapp"; Components: testapp
+
+[Components]
+Name: "winpython"; Description: "WinPython 64bit"; Types: full compact custom; Flags: fixed
+Name: "testapp"; Description: "Django test application"; Types: full
+
+
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 ;[Files]
@@ -42,42 +49,36 @@ Source: "./deploy/*"; DestDir: "{app}/bin"; Flags: ignoreversion recursesubdirs 
 ;Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 
-[Tasks]
-Name: "install_winpython"; Description: "Install WinPython"; GroupDescription: "WinPython:";
+;[Tasks]
+;Name: "install_winpython"; Description: "Install WinPython"; GroupDescription: "WinPython:";
 
-[Run]
-Filename: "{app}\winpython.exe"; StatusMsg: "Installing WinPython"; Tasks: install_winpython; Flags: skipifsilent
-
-
+;[Run]
+;Filename: "{app}\winpython.exe"; StatusMsg: "Installing WinPython"; Tasks: install_winpython; Flags: skipifsilent
 
 [UninstallDelete]
-Type: files; Name: "{app}\winpython.exe"
+Type: files; Name: "{app}\winpython_installer.exe"
+Type: filesandordirs; Name: "{app}\WinPython-64bit-*"
 
 
 [Code]
-procedure RunOtherInstaller;
-var
-  ResultCode: Integer;
-begin
-  if not Exec(ExpandConstant('{app}\winpython.exe'), '', '', SW_SHOWNORMAL,
-    ewWaitUntilTerminated, ResultCode)
-  then
-    MsgBox('Other installer failed to run!' + #13#10 +
-      SysErrorMessage(ResultCode), mbError, MB_OK);
-end;
-
 procedure InitializeWizard();
 begin
-    idpAddFile('http://sourceforge.net/projects/winpython/files/WinPython_3.5/3.5.1.1/WinPython-64bit-3.5.1.1Zero.exe/download', ExpandConstant('{tmp}\winpython.exe'));
+    idpAddFile('http://sourceforge.net/projects/winpython/files/WinPython_3.5/3.5.1.1/WinPython-64bit-3.5.1.1Zero.exe/download', ExpandConstant('{tmp}\winpython_installer.exe'));
+    
     idpDownloadAfter(wpReady);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
 begin
     if CurStep = ssPostInstall then 
     begin
         // Copy downloaded files to application directory
-        FileCopy(ExpandConstant('{tmp}\winpython.exe'), ExpandConstant('{app}\winpython.exe'), false);
+        FileCopy(ExpandConstant('{tmp}\winpython_installer.exe'), ExpandConstant('{app}\winpython_installer.exe'), false);
+        if not Exec(ExpandConstant('{app}\winpython_installer.exe'), ExpandConstant('/S /D="{app}\winpython\"'), '' , SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode)
+        then
+            MsgBox('Other installer failed to run!' + #13#10 + SysErrorMessage(ResultCode), mbError, MB_OK);
     end;
 end;
 
