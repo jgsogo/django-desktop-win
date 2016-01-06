@@ -28,12 +28,12 @@ SolidCompression=yes
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
-;[Files]
-;Source: "{app}winpython.exe"; DestDir: "{app}"; AfterInstall: RunOtherInstaller
+[Files]
+Source: "./deploy/*"; DestDir: "{app}/bin"; Flags: ignoreversion recursesubdirs createallsubdirs
+; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 ;[Files]
-;Source: "./WinPython-64bit-3.5.1.1Zero/python-3.5.1.amd64/*"; DestDir: "{app}"; Excludes: "*.pyc"; Flags: ignoreversion recursesubdirs createallsubdirs
-; NOTE: Don't use "Flags: ignoreversion" on any shared system files
+;Source: "{app}winpython.exe"; DestDir: "{app}"; AfterInstall: RunOtherInstaller
 
 ;[Icons]
 ;Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
