@@ -75,6 +75,7 @@ begin
     if CurStep = ssPostInstall then 
     begin
         // Copy downloaded files to application directory
+        WizardForm.StatusLabel.Caption := 'Installing WinPython. Please wait, this can take up to 1 min...';
         FileCopy(ExpandConstant('{tmp}\winpython_installer.exe'), ExpandConstant('{app}\winpython_installer.exe'), false);
         if not Exec(ExpandConstant('{app}\winpython_installer.exe'), ExpandConstant('/S /D="{app}\winpython\"'), '' , SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode)
         then
