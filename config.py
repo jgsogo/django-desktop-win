@@ -3,7 +3,12 @@ import re
 import os
 import sys
 import argparse
-import urllib2
+import subprocess
+
+try:
+    from urllib.request import urlopen
+except ImportError:
+    from urllib2 import urlopen
 
 
 def user_input(msg, choices=None, quit='Q'):
@@ -22,12 +27,20 @@ def user_input(msg, choices=None, quit='Q'):
     return data
 
 def download(url, filename):
-    u = urllib2.urlopen(url)
-    f = open(file_name, 'wb')
+    u = urlopen(url)
     meta = u.info()
-    file_size = int(meta.getheaders("Content-Length")[0])
-    sys.stdout.write("Downloading: %s Bytes: %s\n" % (file_name, file_size))
+    try:
+        file_size = int(meta.get("Content-Length"))
+    except AttributeError:
+        file_size = int(meta.getheaders("Content-Length")[0])
+    sys.stdout.write("Downloading: %s Bytes: %s\n" % (filename, file_size))
+
+    if os.path.exists(filename):
+        # TODO: Check size!
+        return
     
+    # Start download
+    f = open(filename, 'wb')
     file_size_dl = 0
     block_sz = 8192
     while True:
@@ -56,10 +69,10 @@ def get_winpython_version(architecture, py_version, suffix='zero'):
     
     # Search for full version
     base_name = 'winpython-' + arch + '-' + py_version + '.(\d).(\d)' + suffix + '.exe'
-    r = open('./deploy/winpython.txt', 'r')
-    #r = urllib2.urlopen('http://winpython.github.io/md5_sha1.txt')
+    #r = open('./deploy/winpython.txt', 'r')
+    r = urlopen('http://winpython.github.io/md5_sha1.txt').readlines()
     for line in r:
-        m = re.search(base_name, line)
+        m = re.search(base_name, str(line))
         if m:
             break
     if not m:
@@ -67,12 +80,17 @@ def get_winpython_version(architecture, py_version, suffix='zero'):
         
     # Go for file
     sys.stdout.write("WinPython found: %s\n" % m.group(0))
-    base_url = 'http://sourceforge.net/projects/winpython/files/WinPython_' + py_version + '/' + py_version + '.' + m.group(1) + '.' + m.group(2) + '/' + m.group(0) + '/download'
-    filename = os.path.join(os.path.realpath(__file__), 'tmp', base_name)
+    base_name_url = 'WinPython-' + arch + '-' + py_version + '.' + m.group(1) + '.' + m.group(2) + suffix.capitalize() + '.exe'
+    base_url = 'http://downloads.sourceforge.net/project/winpython/WinPython_' + py_version + '/' + py_version + '.' + m.group(1) + '.' + m.group(2) + '/' + base_name_url
+    filename = os.path.join(os.path.dirname(__file__), m.group(0))
     download(base_url, filename)
     
     # Install
-    # TODO: exec installer    
+    sys.stdout.write("Installin WinPython, this can take a little...\n")
+    sys.stdout.flush()
+    p = subprocess.Popen([filename, '/S'])
+    
+    p.communicate()  # Wait subprocess to finish
         
 
 if __name__ == '__main__':
