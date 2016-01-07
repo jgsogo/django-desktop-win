@@ -4,6 +4,7 @@ import os
 import sys
 import argparse
 import subprocess
+import glob
 
 try:
     from urllib.request import urlopen
@@ -56,6 +57,13 @@ def download(url, filename):
 
     f.close()
     
+def find_file(lookup, basedir):
+    ret = []
+    for root, dirnames, filenames in os.walk(basedir):
+        for filename in filenames:
+            if filename == lookup:
+                ret.append(os.path.abspath(os.path.join(root, filename)))
+    return ret
     
 def get_winpython_version(architecture, py_version, suffix='zero'):
     # Base name for winpython download
@@ -88,16 +96,40 @@ def get_winpython_version(architecture, py_version, suffix='zero'):
     # Install
     sys.stdout.write("Installin WinPython, this can take a little...\n")
     sys.stdout.flush()
-    p = subprocess.Popen([filename, '/S'])
+    #p = subprocess.Popen([filename, '/S'])
+
+    #p.communicate()  # Wait subprocess (install winpython) to finish
     
-    p.communicate()  # Wait subprocess to finish
+    # Return path to python.exe and pip.exe
+    dirname = os.path.abspath(os.path.join('.', base_name_url.rsplit('.',1)[0]))
+    python_exe = find_file('python.exe', dirname)[0]
+    pip_exe = find_file('pip.exe', dirname)[0]
+    env_bat = find_file('env.bat', dirname)[0]
+    return python_exe, pip_exe, env_bat
         
+
+def inspect_django_dir(dir):
+    # Look for 'manage.py' and 'requirements.py'
+    manage_script = find_file('manage.py', dir)
+    requirements_file = find_file('requirements.txt', dir)
+    if len(manage_script) != 1 or len(requirements_file) > 1:
+        raise ValueError('django_dir must point to just one single project')
+    req = requirements_file[0] if len(requirements_file) > 0 else None
+    return manage_script[0], req
+        
+def run_env_command(command, env_bat):
+    if isinstance(command, list):
+        command = ' '.join(command)
+    full_cmd = env_bat + '& ' + command
+    p = subprocess.Popen(full_cmd, stdout=sys.stdout, shell=True)
+    p.communicate()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Configure django-desktop-win.')
     parser.add_argument('mode', metavar='mode', type=str, nargs=1, help='working mode: develop')
     parser.add_argument('--python', nargs='?', help='python version to work with: 2.7, 3.4,...')
     parser.add_argument('--arch', nargs='?', choices=['x64', 'x86'], help='target architecture (Win32)')
+    parser.add_argument('--django_dir', nargs='?', help='Path to a self contained Django project')
     
     # Get needed data
     args = parser.parse_args()    
@@ -113,10 +145,26 @@ if __name__ == '__main__':
     sys.stdout.write(" - python version '%s'\n" % py_version)
 
     # Install winpython
-    get_winpython_version(architecture, py_version)
+    python_exe, pip_exe, env_bat = get_winpython_version(architecture, py_version)
     
-    # Install requirements for django projects
+    # Inspect django project directory
+    django_dir = os.path.abspath(args.django_dir)
+    if not os.path.isabs(django_dir):
+        print("*"*20)
+        django_dir = os.path.join(os.paht.dirname(__file__), django_dir)
+        
+    if django_dir:
+        sys.stdout.write(" - install for django at: %s\n" % args.django_dir)
+        manage_script, requirements_file = inspect_django_dir(args.django_dir)
     
+        # Install requirements for django projects
+        if requirements_file:
+            sys.stdout.write(" - installing requirements.\n")
+            sys.stdout.flush()
+            run_env_command([pip_exe, 'install', '-r', requirements_file], env_bat)
+
+        with open('start_server.bat', 'w') as f:
+            f.write('%s & %s %s runserver' % (env_bat, python_exe, manage_script))
     # Buil ISS script with all this data.
     # - substitute python version strings
     # - add django project to ISS (it may be in a different folder)

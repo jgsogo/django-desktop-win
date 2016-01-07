@@ -2,3 +2,7 @@ Output/
 build_*
 deploy/
 winpython*
+*.sqlite3
+__pycache__
+
+start_server.bat
