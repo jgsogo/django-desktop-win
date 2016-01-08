@@ -1,5 +1,5 @@
 #include <idp.iss>
-#include <defines.iss>
+#include "defines.iss"
 
 #define MyAppVersion "1.5"
 #define MyAppPublisher "My Company, Inc."
@@ -34,17 +34,17 @@ Source: "{#DjangoDir}/*"; DestDir: "{app}/{#MyAppName}"; Components: {#MyAppName
 
 [Components]
 Name: "winpython"; Description: "WinPython {#PythonVersion} {#WinPythonArchitecture}"; Types: full compact custom; Flags: fixed
-Name: "django_app"; Description: "Django application: {#MyAppName}"; Types: full
+Name: "{#MyAppName}"; Description: "Django application: {#MyAppName}"; Types: full
 
 [UninstallDelete]
-Type: files; Name: "{app}\{#WinPythonFullName}.exe"
-Type: filesandordirs; Name: "{app}\{#WinPythonFullName}"
+Type: files; Name: "{app}\{#WinPythonBasename}.exe"
+Type: filesandordirs; Name: "{app}\{#WinPythonBasename}"
 
 
 [Code]
 procedure InitializeWizard();
 begin
-    idpAddFile('{#WinPythonDownload}', ExpandConstant('{tmp}\{#WinPythonFullName}.exe'));
+    idpAddFile('{#WinPythonDownload}', ExpandConstant('{tmp}\{#WinPythonBasename}.exe'));
     
     idpDownloadAfter(wpReady);
 end;
@@ -57,8 +57,8 @@ begin
     begin
         // Copy downloaded files to application directory
         WizardForm.StatusLabel.Caption := 'Installing WinPython. Please wait, this can take up to 1 min...';
-        FileCopy(ExpandConstant('{tmp}\{#WinPythonFullName}.exe'), ExpandConstant('{app}\{#WinPythonFullName}.exe'), false);
-        if not Exec(ExpandConstant('{app}\{#WinPythonFullName}.exe'), ExpandConstant('/S /D="{app}\{#WinPythonFullName}\"'), '' , SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode)
+        FileCopy(ExpandConstant('{tmp}\{#WinPythonBasename}.exe'), ExpandConstant('{app}\{#WinPythonBasename}.exe'), false);
+        if not Exec(ExpandConstant('{app}\{#WinPythonBasename}.exe'), ExpandConstant('/S /D="{app}\{#WinPythonBasename}\"'), '' , SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode)
         then
             MsgBox('Other installer failed to run!' + #13#10 + SysErrorMessage(ResultCode), mbError, MB_OK);
     end;
