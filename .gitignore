@@ -6,3 +6,4 @@ winpython*
 __pycache__
 
 start_server.bat
+defines.iss
