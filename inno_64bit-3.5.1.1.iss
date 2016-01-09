@@ -78,7 +78,7 @@ begin
             MsgBox('Other installer failed to run!' + #13#10 + SysErrorMessage(ResultCode), mbError, MB_OK);
             
         // Create command run script
-        SaveStringToFile(ExpandConstant('{app}/start.bat'), #13#10 + ExpandConstant('"{app}/bin/cefsimple.exe" "{app}/{#MyAppName}/{#ManagePyRelPath}/run.py"') + #13#10, False);
+        SaveStringToFile(ExpandConstant('{app}/start.bat'), #13#10 + ExpandConstant('"{app}/bin/cefsimple.exe" --manage "{app}/{#MyAppName}/{#ManagePyRelPath}/run.py"') + #13#10, False);
     end;
 end;
 

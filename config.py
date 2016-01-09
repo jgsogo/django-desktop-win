@@ -83,19 +83,19 @@ class WinPythonConfig():
     python_version = None
     architecture = None
     
-    def __init__(self, parsed_args, interactive=True):
+    def __init__(self, python, arch, interactive=True):
         self.interactive = True
-        self.get_python_version(parsed_args)
-        self.get_architecture(parsed_args)
+        self.get_python_version(python)
+        self.get_architecture(arch)
         
         self.python_exe = None
         self.pip_exe = None
         self.env_bat = None
 
         
-    def get_python_version(self, parsed_args):
-        if parsed_args.python:
-            self.python_version = parsed_args.python
+    def get_python_version(self, python):
+        if python:
+            self.python_version = python
         elif not self.python_version and self.interactive:
             self.python_version = user_input("   >> python version to work with [2.7|3.5|...]")
         else:
@@ -106,10 +106,11 @@ class WinPythonConfig():
             raise ValueError("Python version not well formed: '%s'" % self.python_version)
             
         print(" - python version: %s" % self.python_version)
+        return self.python_version
     
-    def get_architecture(self, parsed_args):
-        if parsed_args.arch:
-            self.architecture = parsed_args.arch
+    def get_architecture(self, arch):
+        if arch:
+            self.architecture = arch
         elif not self.architecture and self.interactive:
             self.architecture = user_input("   >> target architecture (Win32) %s" % self.ARCH_CHOICES, choices=self.ARCH_CHOICES)
         else:
@@ -120,6 +121,7 @@ class WinPythonConfig():
             raise ValueError("Invalid architecture type. Valid types are %s" % self.ARCH_CHOICES)
             
         print(" - architecture: %s" % self.architecture)
+        return self.architecture
     
     @property
     def basename(self):
@@ -216,13 +218,13 @@ class DjangoConfig():
     django_dir = None
     additional_packages = ['waitress',]
         
-    def __init__(self, parsed_args, interactive=True):
+    def __init__(self, django_dir, interactive=True):
         self.interactive = interactive
-        self.get_django_dir(parsed_args)
+        self.get_django_dir(django_dir)
 
-    def get_django_dir(self, parsed_args):
-        if parsed_args.django_dir:
-            self.django_dir = parsed_args.django_dir
+    def get_django_dir(self, django_dir):
+        if django_dir:
+            self.django_dir = django_dir
         elif not self.django_dir and self.interactive:
             self.django_dir = user_input("   >> django directory")
         else:
@@ -232,6 +234,7 @@ class DjangoConfig():
             raise ValueError("Provided Django directory (%s) does not exist or it is inaccesible" % self.django_dir)
         
         print(" - django_dir: %s" % self.django_dir)
+        return self.django_dir
         
     def install(self):
         print("Installing Django project and requirements, this can take a little...")
@@ -249,37 +252,62 @@ class DjangoConfig():
         
 class ConfigScript():
     iss_defines = {}
+    ini_file = 'config.ini'
     
     def parse_args(self):
         parser = argparse.ArgumentParser(description='Configure django-desktop-win.')
-        parser.add_argument('mode', metavar='mode', type=str, nargs='?', default='develop', help='working mode')
         parser.add_argument('--python', nargs='?', help='python version to work with: 2.7, 3.4,...')
         parser.add_argument('--arch', nargs='?', choices=['x64', 'x86'], help='target architecture (Win32)')
         parser.add_argument('--django_dir', nargs='?', help='Path to a self contained Django project')
-        args = parser.parse_args()
-        # Run in desired mode
-        self.mode = args.mode
+        args = vars(parser.parse_args())
+
+        args = self.read_ini(os.path.dirname(__file__), args)
         return args
         
-    def develop(self, args):
+    def save_ini(self, path, args):
+        with open(os.path.join(path, self.ini_file), 'w') as f:
+            for key, value in args.items():
+                if value is not None:
+                    f.write('%s=%s\n' % (key, value))
+        
+    def read_ini(self, path, args):        
+        try:
+            with open(os.path.join(path, self.ini_file), 'r') as f:
+                for line in f.readlines():
+                    if len(line.strip()):
+                        item = line.split('=')
+                        if item[0] not in args or args[item[0]] is None:
+                            args[item[0]] = item[1].strip()
+        except FileNotFoundError:
+            pass
+        return args
+        
+    def run(self, *args, **kwargs):
+        args = self.parse_args()
         base_path = os.path.dirname(__file__)
         
         # WinPython
         print("Gathering input data for WinPython")
-        winpython = WinPythonConfig(parsed_args=args)
+        winpython = WinPythonConfig(args['python'], args['arch'])
         filename = winpython.download_to(base_path)
         winpython.install(filename, async=False)
+        args['python'] = winpython.python_version
+        args['arch'] = winpython.architecture
         
         # Django
         print("\nGathering input data for Django project")
-        django = DjangoConfig(parsed_args=args)
+        django = DjangoConfig(args['django_dir'])
         django.install()
+        args['django_dir'] = django.django_dir
         
         if django.requirements_file:
             print("Installing requirements")
             winpython.run_python([winpython.pip_exe, 'install', '-r', django.requirements_file, '--upgrade'], async=False)
             
+                    
         # Create stuff
+        # - config.ini: store configuration
+        self.save_ini(os.path.dirname(__file__), args)
         
         # - run.py: file to run django using waitress
         with open(os.path.join(base_path, 'run.py'), 'w') as f:
@@ -305,6 +333,14 @@ serve(application, host='127.0.0.1', port=0)
         with open(os.path.join(base_path, 'start_server.bat'), 'w') as f:
             f.write('%s & %s %s runserver' % (winpython.env_bat, winpython.python_exe, django.manage_script))
             
+        # - start_cef.bat: for local development
+        with open(os.path.join(base_path, 'start_cef.bat'), 'w') as f:
+            cef_exe = find_file('cefsimple.exe', os.path.join(base_path, 'deploy'))
+            if not len(cef_exe):
+                print("cefsimple.exe not found. You have to compile CEF and call config again.")
+            else:
+                f.write('"%s" --manage "%s"' % (cef_exe[0], django.manage_script))
+            
         # - defines.iss
         with open(os.path.join(base_path, 'defines.iss'), 'w') as f:
             f.write('#define MyAppName "%s"\n' % "MyAppName")
@@ -318,15 +354,7 @@ serve(application, host='127.0.0.1', port=0)
             f.write('#define WinPythonEnvRelPath "%s"\n' % os.path.relpath(winpython.env_bat, base_path))
             f.write('#define ManagePyPath "%s"\n' % os.path.relpath(django.manage_script, django.django_dir))
             f.write('#define ManagePyRelPath "%s"\n' % os.path.relpath(os.path.dirname(django.manage_script), django.django_dir))
-            
-        
-    def run(self, *args, **kwargs):
-        args = self.parse_args()
 
-        if self.mode == 'develop':
-            self.develop(args)
-        else:
-            raise ValueError("Unrecognized mode '%s'" % args.mode)
 
         
 if __name__ == '__main__':
