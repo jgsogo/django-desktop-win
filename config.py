@@ -356,10 +356,11 @@ serve(application, host='127.0.0.1', port=8000)
         #    f.write('"%s" "%s" runserver' % (winpython.python_exe, django.manage_script))
             
         # - start_cef.bat: for local development (local)
+        deploy_dir = os.path.abspath(os.path.join(base_path, 'deploy', 'bin64' if args['arch'] == 'x64' else 'bin32'))
         with open(os.path.join(base_path, 'start_cef.bat'), 'w') as f:
-            cef_exe = find_file('cefsimple.exe', os.path.join(base_path, 'deploy'))
+            cef_exe = find_file('cefsimple.exe', deploy_dir)
             if not len(cef_exe):
-                print("cefsimple.exe not found. You have to compile CEF and call config again.")
+                print("cefsimple.exe not found at '%s'. You have to compile CEF and call config again." % deploy_dir)
             else:
                 f.write('"%s" --python="%s" --manage="%s" --url=%s' % (cef_exe[0], winpython.python_exe, run_py, args['home']))
             
@@ -367,6 +368,7 @@ serve(application, host='127.0.0.1', port=8000)
         with open(os.path.join(base_path, 'defines.iss'), 'w') as f:
             f.write('#define MyAppName "%s"\n' % args['appName'])
             f.write('#define Architecture "%s"\n' % args['arch'])
+            f.write('#define DeployDir "%s"\n' % deploy_dir)
             f.write('#define Home "%s"\n' % args['home'])
             
             f.write('#define DjangoDir "%s"\n' % django.django_dir)

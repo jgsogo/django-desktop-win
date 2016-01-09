@@ -29,7 +29,7 @@ SolidCompression=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-Source: "./deploy/bin/*"; DestDir: "{app}/bin"; Flags: ignoreversion recursesubdirs createallsubdirs; Permissions: users-modify
+Source: "{#DeployDir}/*"; DestDir: "{app}/bin"; Flags: ignoreversion recursesubdirs createallsubdirs; Permissions: users-modify
 Source: "{#DjangoDir}/*"; Excludes: "*.~*,*.pyc,*.sqlite3"; DestDir: "{app}/{#MyAppName}"; Components: {#MyAppName}; Flags: ignoreversion recursesubdirs createallsubdirs; Permissions: users-modify
 Source: "./deploy/requirements.txt"; DestDir: "{app}/tmp"; Components: {#MyAppName}; Flags: ignoreversion
 Source: "./deploy/run.py"; DestDir: "{app}/{#MyAppName}/{#ManagePyRelPath}"; Components: {#MyAppName}; Flags: ignoreversion
@@ -90,15 +90,28 @@ begin
         if not Exec(ExpandConstant('{app}\{#WinPythonRelExe}'), ExpandConstant('"{app}\{#MyAppName}\{#ManagePyPath}" migrate'), '' , SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode)
         then
             MsgBox('Other installer failed to run!' + #13#10 + SysErrorMessage(ResultCode), mbError, MB_OK);
-            
-        // Create superuser        
-        WizardForm.StatusLabel.Caption := 'Create superuser to access admin...';
-        if not Exec(ExpandConstant('{app}\{#WinPythonRelExe}'), ExpandConstant('"{app}\{#MyAppName}\{#ManagePyPath}" createsuperuser'), '' , SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode)
-        then
-            MsgBox('Other installer failed to run!' + #13#10 + SysErrorMessage(ResultCode), mbError, MB_OK);
-        
+           
+        if not RegKeyExists(HKLM, ExpandConstant('Software\{#MyAppPublisher}\{#MyAppName}')) then
+        begin
+            // Create superuser        
+            WizardForm.StatusLabel.Caption := 'Create superuser to access admin...';
+            if not Exec(ExpandConstant('{app}\{#WinPythonRelExe}'), ExpandConstant('"{app}\{#MyAppName}\{#ManagePyPath}" createsuperuser'), '' , SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode)
+            then
+                MsgBox('Other installer failed to run!' + #13#10 + SysErrorMessage(ResultCode), mbError, MB_OK);
+                
+            RegWriteStringValue(HKLM, ExpandConstant('Software\{#MyAppPublisher}\{#MyAppName}'), 'DB', ExpandConstant('{sysuserinfoname}'));
+        end;
         // Create command run script
         // SaveStringToFile(ExpandConstant('{app}/{#MyAppName}.bat'), #13#10 + ExpandConstant('"{app}/bin/cefsimple.exe" --python="{app}\{#WinPythonRelExe}" --manage="{app}\{#MyAppName}\{#ManagePyRelPath}\run.py" --url={#Home}') + #13#10, False);
     end;
 end;
 
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usPostUninstall then
+  begin
+    if RegKeyExists(HKLM, ExpandConstant('Software\{#MyAppPublisher}\{#MyAppName}')) then
+        RegDeleteKeyIncludingSubkeys(HKLM, ExpandConstant('Software\{#MyAppPublisher}\{#MyAppName}'));
+  end;
+end;

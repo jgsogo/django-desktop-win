@@ -172,7 +172,12 @@ include("macros")
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # Install destination
-set(CEF_INSTALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../deploy/bin")
+if(PROJECT_ARCH STREQUAL "x86")
+    # Only used on 32-bit platforms.
+    set(CEF_INSTALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../deploy/bin32")
+else()
+    set(CEF_INSTALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../deploy/bin64")
+endif()
 
 # Allow C++ programs to use stdint.h macros specified in the C99 standard that
 # aren't in the C++ standard (e.g. UINT8_MAX, INT64_MIN, etc).
