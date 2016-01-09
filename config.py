@@ -216,7 +216,6 @@ class WinPythonConfig():
 
 class DjangoConfig():
     django_dir = None
-    additional_packages = ['waitress',]
         
     def __init__(self, django_dir, interactive=True):
         self.interactive = interactive
@@ -286,6 +285,13 @@ class ConfigScript():
         args = self.parse_args()
         base_path = os.path.dirname(__file__)
         
+        if 'appName' not in args:
+            args['appName'] = user_input("   >> Application Name: ")
+            
+        if 'home' not in args:
+            home = user_input("   >> Home URL for application (http://127.0.0.1:8000<input>)")
+            args['home'] = 'http://127.0.0.1:8000' + home
+        
         # WinPython
         print("Gathering input data for WinPython")
         winpython = WinPythonConfig(args['python'], args['arch'])
@@ -303,25 +309,41 @@ class ConfigScript():
         if django.requirements_file:
             print("Installing requirements")
             winpython.run_python([winpython.pip_exe, 'install', '-r', django.requirements_file, '--upgrade'], async=False)
+            winpython.run_python([winpython.pip_exe, 'install', 'waitress'], async=False)
             
                     
         # Create stuff
         # - config.ini: store configuration
         self.save_ini(os.path.dirname(__file__), args)
         
-        # - run.py: file to run django using waitress
-        with open(os.path.join(base_path, 'run.py'), 'w') as f:
+        # - run.py: file to run django using waitress (local)
+        run_py = os.path.abspath(os.path.join(base_path, 'run.py'))
+        with open(run_py, 'w') as f:
+            wsgi = find_file('wsgi.py', django.django_dir)[0]
+            wsgi_paths = os.path.split(os.path.dirname(wsgi))
+            f.write("""
+import sys
+sys.path.append(r"{manage_path}")
+
+from waitress import serve
+from {wsgi_dir}.wsgi import application
+
+serve(application, host='127.0.0.1', port=8000)
+""".format(manage_path=os.path.dirname(django.manage_script), wsgi_dir=wsgi_paths[-1]))
+        
+        # - run.py: file to run django using waitress (deploy)
+        with open(os.path.abspath(os.path.join(base_path, 'deploy', 'run.py')), 'w') as f:
             wsgi = find_file('wsgi.py', django.django_dir)[0]
             wsgi_paths = os.path.split(os.path.dirname(wsgi))
             f.write("""
 from waitress import serve
 from {wsgi_dir}.wsgi import application
 
-serve(application, host='127.0.0.1', port=0)
+serve(application, host='127.0.0.1', port=8000)
 """.format(wsgi_dir=wsgi_paths[-1]))
         
         # - requirements.txt: 
-        with open(os.path.join(base_path, 'requirements.txt'), 'w') as f:
+        with open(os.path.join(base_path, 'deploy', 'requirements.txt'), 'w') as f:
             waitress = False
             for line in open(django.requirements_file, 'r').readlines():
                 waitress = waitress or 'waitress' in line
@@ -330,28 +352,34 @@ serve(application, host='127.0.0.1', port=0)
                 f.write('waitress')
         
         # - start_server.bat: for local development
-        with open(os.path.join(base_path, 'start_server.bat'), 'w') as f:
-            f.write('%s & %s %s runserver' % (winpython.env_bat, winpython.python_exe, django.manage_script))
+        #with open(os.path.join(base_path, 'start_server.bat'), 'w') as f:
+        #    f.write('"%s" "%s" runserver' % (winpython.python_exe, django.manage_script))
             
-        # - start_cef.bat: for local development
+        # - start_cef.bat: for local development (local)
         with open(os.path.join(base_path, 'start_cef.bat'), 'w') as f:
             cef_exe = find_file('cefsimple.exe', os.path.join(base_path, 'deploy'))
             if not len(cef_exe):
                 print("cefsimple.exe not found. You have to compile CEF and call config again.")
             else:
-                f.write('"%s" --manage "%s"' % (cef_exe[0], django.manage_script))
+                f.write('"%s" --python="%s" --manage="%s" --url=%s' % (cef_exe[0], winpython.python_exe, run_py, args['home']))
             
         # - defines.iss
         with open(os.path.join(base_path, 'defines.iss'), 'w') as f:
-            f.write('#define MyAppName "%s"\n' % "MyAppName")
+            f.write('#define MyAppName "%s"\n' % args['appName'])
+            f.write('#define Architecture "%s"\n' % args['arch'])
+            f.write('#define Home "%s"\n' % args['home'])
+            
             f.write('#define DjangoDir "%s"\n' % django.django_dir)
             f.write('#define PythonVersion "%s"\n' % winpython.python_version)
             f.write('#define WinPythonArchitecture "%s"\n' % winpython.architecture)
             f.write('#define WinPythonBasename "%s"\n' % winpython.basename)
             f.write('#define WinPythonDownload "%s"\n' % winpython.download_url)
-            f.write('#define WinPythonRelPath "%s"\n' % os.path.relpath(winpython.python_exe, base_path))
+            
+            f.write('#define WinPythonRelPath "%s"\n' % os.path.relpath(os.path.dirname(winpython.python_exe), base_path))
+            f.write('#define WinPythonRelExe "%s"\n' % os.path.relpath(winpython.python_exe, base_path))
             f.write('#define WinPythonPipRelPath "%s"\n' % os.path.relpath(winpython.pip_exe, base_path))
             f.write('#define WinPythonEnvRelPath "%s"\n' % os.path.relpath(winpython.env_bat, base_path))
+            
             f.write('#define ManagePyPath "%s"\n' % os.path.relpath(django.manage_script, django.django_dir))
             f.write('#define ManagePyRelPath "%s"\n' % os.path.relpath(os.path.dirname(django.manage_script), django.django_dir))
 

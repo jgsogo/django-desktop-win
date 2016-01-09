@@ -46,10 +46,6 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   // Provide CEF with command-line arguments.
   CefMainArgs main_args(hInstance);
 
-  // Run local server
-  CefRefPtr<LocalServer> instance(new LocalServer);
-  instance->run_server(8080);
-
   // SimpleApp implements application-level callbacks. It will create the first
   // browser instance in OnContextInitialized() after CEF has initialized.
   CefRefPtr<SimpleApp> app(new SimpleApp);
@@ -72,6 +68,14 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
 
   // Initialize CEF.
   CefInitialize(main_args, settings, app.get(), sandbox_info);
+
+  // Run local server
+  CefRefPtr<LocalServer> instance(new LocalServer);
+  CefRefPtr<CefCommandLine> command_line =
+	  CefCommandLine::GetGlobalCommandLine();
+  std::string python = command_line->GetSwitchValue("python");
+  std::string manage = command_line->GetSwitchValue("manage");
+  instance->run_server(python, manage);
 
   // Run the CEF message loop. This will block until CefQuitMessageLoop() is
   // called.

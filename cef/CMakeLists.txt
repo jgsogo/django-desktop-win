@@ -172,7 +172,7 @@ include("macros")
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # Install destination
-set(CEF_INSTALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../deploy")
+set(CEF_INSTALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../deploy/bin")
 
 # Allow C++ programs to use stdint.h macros specified in the C99 standard that
 # aren't in the C++ standard (e.g. UINT8_MAX, INT64_MIN, etc).

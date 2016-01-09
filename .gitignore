@@ -5,6 +5,7 @@ winpython*
 *.sqlite3
 __pycache__
 
+django/testapp/static
 start_server.bat
 defines.iss
 config.ini

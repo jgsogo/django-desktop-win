@@ -21,7 +21,7 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={pf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
-OutputBaseFilename=setup
+OutputBaseFilename={#MyAppName}_win32_{#architecture}
 Compression=lzma
 SolidCompression=yes
 
@@ -29,10 +29,14 @@ SolidCompression=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-Source: "./deploy/*"; DestDir: "{app}/bin"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#DjangoDir}/*"; DestDir: "{app}/{#MyAppName}"; Components: {#MyAppName}; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "requirements.txt"; DestDir: "{app}/tmp"; Components: {#MyAppName}; Flags: ignoreversion
-Source: "run.py"; DestDir: "{app}/{#MyAppName}/{#ManagePyRelPath}"; Components: {#MyAppName}; Flags: ignoreversion
+Source: "./deploy/bin/*"; DestDir: "{app}/bin"; Flags: ignoreversion recursesubdirs createallsubdirs; Permissions: users-modify
+Source: "{#DjangoDir}/*"; Excludes: "*.~*,*.pyc,*.sqlite3"; DestDir: "{app}/{#MyAppName}"; Components: {#MyAppName}; Flags: ignoreversion recursesubdirs createallsubdirs; Permissions: users-modify
+Source: "./deploy/requirements.txt"; DestDir: "{app}/tmp"; Components: {#MyAppName}; Flags: ignoreversion
+Source: "./deploy/run.py"; DestDir: "{app}/{#MyAppName}/{#ManagePyRelPath}"; Components: {#MyAppName}; Flags: ignoreversion
+Source: "./cef/cefsimple/res/development.ico"; DestDir: "{app}/bin"
+
+[Dirs]
+Name: "{app}/{#MyAppName}"; Permissions: everyone-full
 
 [Components]
 Name: "winpython"; Description: "WinPython {#PythonVersion} {#WinPythonArchitecture}"; Types: full compact custom; Flags: fixed
@@ -41,13 +45,15 @@ Name: "{#MyAppName}"; Description: "Django application: {#MyAppName}"; Types: fu
 [UninstallDelete]
 Type: files; Name: "{app}\{#WinPythonBasename}.exe"
 Type: filesandordirs; Name: "{app}\{#WinPythonBasename}"
-Type: filesandordirs; Name: "{app}\start.bat"
+Type: filesandordirs; Name: "{app}\{#MyAppName}.bat"
 
 [Run]
-;Filename: "{app}\{#WinPythonPipRelPath}"; Parameters: "install -r {app}\tmp\requirements.txt"; StatusMsg: "Installing requirements..."
-Filename: "{app}\{#WinPythonRelPath}"; Parameters: "{app}\{#MyAppName}\{#ManagePyPath} migrate"; StatusMsg: "Migrate Django database..."
+Filename: {app}\bin\cefsimple.exe; Description: "Start {#MyAppName} after finishing installation"; WorkingDir: "{app}"; Parameters: "--python=""{app}\{#WinPythonRelExe}"" --manage=""{app}\{#MyAppName}\{#ManagePyRelPath}\run.py"" --url={#Home}"; Flags: postinstall skipifsilent
 
-
+[Icons]
+Name: "{group}\{#MyAppName}"; Filename: "{app}\bin\cefsimple.exe"; WorkingDir: "{app}"; Parameters: "--python=""{app}\{#WinPythonRelExe}"" --manage=""{app}\{#MyAppName}\{#ManagePyRelPath}\run.py"" --url={#Home}"; IconFilename: "{app}/bin/development.ico"
+Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
+Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\bin\cefsimple.exe"; WorkingDir: "{app}"; Parameters: "--python=""{app}\{#WinPythonRelExe}"" --manage=""{app}\{#MyAppName}\{#ManagePyRelPath}\run.py"" --url={#Home}"; IconFilename: "{app}/bin/development.ico"
 
 [Code]
 procedure InitializeWizard();
@@ -56,6 +62,8 @@ begin
     
     idpDownloadAfter(wpReady);
 end;
+
+
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
@@ -73,12 +81,24 @@ begin
             
         // Install requirements
         WizardForm.StatusLabel.Caption := 'Installing Python requirements...';
-        if not Exec(ExpandConstant('{app}\{#WinPythonBasename}\WinPython Command Prompt.exe'), ExpandConstant('"pip install -r ..\..\tmp\requirements.txt"'), '' , SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode)
+        if not Exec(ExpandConstant('{app}\{#WinPythonPipRelPath}'), ExpandConstant('install -r "{app}/tmp/requirements.txt" --upgrade --target="{app}/{#WinPythonRelPath}/Lib/site-packages/"'), '' , SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode)
         then
             MsgBox('Other installer failed to run!' + #13#10 + SysErrorMessage(ResultCode), mbError, MB_OK);
             
+        // Apply migrations
+        WizardForm.StatusLabel.Caption := 'Applying migrations to project...';
+        if not Exec(ExpandConstant('{app}\{#WinPythonRelExe}'), ExpandConstant('"{app}\{#MyAppName}\{#ManagePyPath}" migrate'), '' , SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode)
+        then
+            MsgBox('Other installer failed to run!' + #13#10 + SysErrorMessage(ResultCode), mbError, MB_OK);
+            
+        // Create superuser        
+        WizardForm.StatusLabel.Caption := 'Create superuser to access admin...';
+        if not Exec(ExpandConstant('{app}\{#WinPythonRelExe}'), ExpandConstant('"{app}\{#MyAppName}\{#ManagePyPath}" createsuperuser'), '' , SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode)
+        then
+            MsgBox('Other installer failed to run!' + #13#10 + SysErrorMessage(ResultCode), mbError, MB_OK);
+        
         // Create command run script
-        SaveStringToFile(ExpandConstant('{app}/start.bat'), #13#10 + ExpandConstant('"{app}/bin/cefsimple.exe" --manage "{app}/{#MyAppName}/{#ManagePyRelPath}/run.py"') + #13#10, False);
+        // SaveStringToFile(ExpandConstant('{app}/{#MyAppName}.bat'), #13#10 + ExpandConstant('"{app}/bin/cefsimple.exe" --python="{app}\{#WinPythonRelExe}" --manage="{app}\{#MyAppName}\{#ManagePyRelPath}\run.py" --url={#Home}') + #13#10, False);
     end;
 end;
 
