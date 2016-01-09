@@ -16,6 +16,7 @@ try:
 except NameError:
     pass
 
+    
 def user_input(msg, choices=None, quit='Q'):
     data = None
     while not data:
@@ -31,6 +32,7 @@ def user_input(msg, choices=None, quit='Q'):
             
     return data
 
+    
 def download(url, filename):
     u = urlopen(url)
     meta = u.info()
@@ -61,6 +63,7 @@ def download(url, filename):
 
     f.close()
     
+    
 def find_file(lookup, basedir):
     ret = []
     for root, dirnames, filenames in os.walk(basedir):
@@ -68,126 +71,7 @@ def find_file(lookup, basedir):
             if filename == lookup:
                 ret.append(os.path.abspath(os.path.join(root, filename)))
     return ret
-    
-def get_winpython_version(architecture, py_version, suffix='zero'):
-    # Base name for winpython download
-    arch = None
-    if architecture == 'x64':
-        arch = '64bit'
-    elif architecture == 'x86':
-        arch = '32bit'
-    else:
-        raise ValueError("Architecture '%s' not recognized" % architecture)
-    
-    # Search for full version
-    base_name = 'winpython-' + arch + '-' + py_version + '.(\d).(\d)' + suffix + '.exe'
-    #r = open('./deploy/winpython.txt', 'r')
-    r = urlopen('http://winpython.github.io/md5_sha1.txt').readlines()
-    for line in r:
-        m = re.search(base_name, str(line))
-        if m:
-            break
-    if not m:
-        sys.stderr.write("Winpython for architecture='%s' and python version='%s' not found. Query was '%s'.\n" % (architecture, py_version, base_name))
-        
-    # Go for file
-    sys.stdout.write("WinPython found: %s\n" % m.group(0))
-    base_name_url = 'WinPython-' + arch + '-' + py_version + '.' + m.group(1) + '.' + m.group(2) + suffix.capitalize() + '.exe'
-    base_url = 'http://downloads.sourceforge.net/project/winpython/WinPython_' + py_version + '/' + py_version + '.' + m.group(1) + '.' + m.group(2) + '/' + base_name_url
-    filename = os.path.join(os.path.dirname(__file__), m.group(0))
-    download(base_url, filename)
-    
-    # Install
-    sys.stdout.write("Installin WinPython, this can take a little...\n")
-    sys.stdout.flush()
-    #p = subprocess.Popen([filename, '/S'])
-
-    #p.communicate()  # Wait subprocess (install winpython) to finish
-    
-    # Return path to python.exe and pip.exe
-    dirname = os.path.abspath(os.path.join('.', base_name_url.rsplit('.',1)[0]))
-    python_exe = find_file('python.exe', dirname)[0]
-    pip_exe = find_file('pip.exe', dirname)[0]
-    env_bat = find_file('env.bat', dirname)[0]
-    return python_exe, pip_exe, env_bat
-        
-
-def inspect_django_dir(dir):
-    # Look for 'manage.py' and 'requirements.py'
-    manage_script = find_file('manage.py', dir)
-    requirements_file = find_file('requirements.txt', dir)
-    if len(manage_script) != 1 or len(requirements_file) > 1:
-        raise ValueError('django_dir must point to just one single project')
-    req = requirements_file[0] if len(requirements_file) > 0 else None
-    return manage_script[0], req
-        
-def run_env_command(command, env_bat):
-    if isinstance(command, list):
-        command = ' '.join(command)
-    full_cmd = env_bat + '& ' + command
-    p = subprocess.Popen(full_cmd, stdout=sys.stdout, shell=True)
-    return p.communicate()
-
-if __name__ == '__main__-':
-    parser = argparse.ArgumentParser(description='Configure django-desktop-win.')
-    parser.add_argument('mode', metavar='mode', type=str, nargs=1, help='working mode: develop')
-    parser.add_argument('--python', nargs='?', help='python version to work with: 2.7, 3.4,...')
-    parser.add_argument('--arch', nargs='?', choices=['x64', 'x86'], help='target architecture (Win32)')
-    parser.add_argument('--django_dir', nargs='?', help='Path to a self contained Django project')
-    
-    # Get needed data
-    args = parser.parse_args()    
-    mode = args.mode[0]
-    
-    sys.stdout.write("Configure django-desktop-win\n")
-    sys.stdout.write(" - running mode '%s'\n" % mode)
-    
-    architecture = args.arch or user_input(">> target architecture (Win32) [x64|x86]", choices=['x64', 'x86'])
-    sys.stdout.write(" - architecture '%s'\n" % architecture)
-
-    py_version = args.python or user_input(">> python version to work with [2.7|3.5|...]")
-    sys.stdout.write(" - python version '%s'\n" % py_version)
-
-    # Install winpython
-    python_exe, pip_exe, env_bat = get_winpython_version(architecture, py_version)
-    
-    # Inspect django project directory
-    django_dir = os.path.abspath(args.django_dir)
-    if not os.path.isabs(django_dir):
-        print("*"*20)
-        django_dir = os.path.join(os.paht.dirname(__file__), django_dir)
-        
-    if django_dir:
-        sys.stdout.write(" - install for django at: %s\n" % args.django_dir)
-        manage_script, requirements_file = inspect_django_dir(args.django_dir)
-    
-        # Install requirements for django projects
-        if requirements_file:
-            sys.stdout.write(" - installing requirements.\n")
-            sys.stdout.flush()
-            run_env_command([pip_exe, 'install', '-r', requirements_file], env_bat)
-
-        # Create run_server batch script
-        with open('start_server.bat', 'w') as f:
-            f.write('%s & %s %s runserver' % (env_bat, python_exe, manage_script))
             
-        # Check it works
-        
-    # Buil ISS script with all this data.
-    with open('defines.iss', 'w') as f:       
-        # Application name
-        name = 'MyAppName'
-        f.write('#define MyAppName "%s"\n' % name)
-        
-        # WinPython stuff
-        f.write('#define PythonVersion "%s"\n' % py_version)
-        f.write('#define WinPythonArchitecture "%s"\n' % architecture)
-        f.write('#define WinPythonFullName "#WinPythonFullName"\n')
-        f.write('#define WinPythonDownload "#WinPythonDownload"\n')
-        
-        # Django stuff
-        f.write('#define DjangoDir "%s"\n' % django_dir)
-        
 
 class WinPythonConfig():
     ARCH_CHOICES = ['x64', 'x86']
@@ -283,26 +167,36 @@ class WinPythonConfig():
     
     def install(self, filename, async=True):
         print("Installing WinPython, this can take a little...")
-        install_process = subprocess.Popen([filename, '/S'])
-        
-        def do_install():
-            print("Finishing WinPython installation")
-            install_process.communicate()
+        dirname = os.path.abspath(filename.rsplit('.',1)[0])
+        if not self.find_exes(dirname):
+            install_process = subprocess.Popen([filename, '/S'])
             
+            def do_install():
+                print("Finishing WinPython installation")
+                install_process.communicate()
+                
+                # Look for python.exe and pip.exe
+                dirname = os.path.abspath(filename.rsplit('.',1)[0])
+                self.find_exes(dirname)            
+                
+            if async:
+                self._on_cleanup.append(do_install)
+            else:
+                do_install()
+    
+    def find_exes(self, dirname):
+        try:
             # Look for python.exe and pip.exe
-            dirname = os.path.abspath(filename.rsplit('.',1)[0])
             self.python_exe = find_file('python.exe', dirname)[0]
             self.pip_exe = find_file('pip.exe', dirname)[0]
             self.env_bat = find_file('env.bat', dirname)[0]
             print(" - python.exe: %s" % self.python_exe)
             print(" - pip.exe   : %s" % self.pip_exe)
             print(" - env.bat   : %s" % self.env_bat)
-            
-        if async:
-            self._on_cleanup.append(do_install)
-        else:
-            do_install()
-            
+            return True
+        except IndexError:
+            return False        
+    
     def run_python(self, command, stdout=sys.stdout, async=True):
         if isinstance(command, list):
             command = ' '.join(command)
@@ -320,7 +214,8 @@ class WinPythonConfig():
 
 class DjangoConfig():
     django_dir = None
-    
+    additional_packages = ['waitress',]
+        
     def __init__(self, parsed_args, interactive=True):
         self.interactive = interactive
         self.get_django_dir(parsed_args)
@@ -350,7 +245,7 @@ class DjangoConfig():
         self.manage_script = manage_script[0]        
         print(" - manage.py       : %s" % self.manage_script)
         print(" - requirements.txt: %s" % self.requirements_file)
-
+        
         
 class ConfigScript():
     iss_defines = {}
@@ -385,9 +280,31 @@ class ConfigScript():
             winpython.run_python([winpython.pip_exe, 'install', '-r', django.requirements_file, '--upgrade'], async=False)
             
         # Create stuff
-        # - start_server.bat
+        
+        # - run.py: file to run django using waitress
+        with open(os.path.join(base_path, 'run.py'), 'w') as f:
+            wsgi = find_file('wsgi.py', django.django_dir)[0]
+            wsgi_paths = os.path.split(os.path.dirname(wsgi))
+            f.write("""
+from waitress import serve
+from {wsgi_dir}.wsgi import application
+
+serve(application, host='127.0.0.1', port=0)
+""".format(wsgi_dir=wsgi_paths[-1]))
+        
+        # - requirements.txt: 
+        with open(os.path.join(base_path, 'requirements.txt'), 'w') as f:
+            waitress = False
+            for line in open(django.requirements_file, 'r').readlines():
+                waitress = waitress or 'waitress' in line
+                f.write(line)
+            if not waitress:
+                f.write('waitress')
+        
+        # - start_server.bat: for local development
         with open(os.path.join(base_path, 'start_server.bat'), 'w') as f:
             f.write('%s & %s %s runserver' % (winpython.env_bat, winpython.python_exe, django.manage_script))
+            
         # - defines.iss
         with open(os.path.join(base_path, 'defines.iss'), 'w') as f:
             f.write('#define MyAppName "%s"\n' % "MyAppName")
@@ -396,6 +313,12 @@ class ConfigScript():
             f.write('#define WinPythonArchitecture "%s"\n' % winpython.architecture)
             f.write('#define WinPythonBasename "%s"\n' % winpython.basename)
             f.write('#define WinPythonDownload "%s"\n' % winpython.download_url)
+            f.write('#define WinPythonRelPath "%s"\n' % os.path.relpath(winpython.python_exe, base_path))
+            f.write('#define WinPythonPipRelPath "%s"\n' % os.path.relpath(winpython.pip_exe, base_path))
+            f.write('#define WinPythonEnvRelPath "%s"\n' % os.path.relpath(winpython.env_bat, base_path))
+            f.write('#define ManagePyPath "%s"\n' % os.path.relpath(django.manage_script, django.django_dir))
+            f.write('#define ManagePyRelPath "%s"\n' % os.path.relpath(os.path.dirname(django.manage_script), django.django_dir))
+            
         
     def run(self, *args, **kwargs):
         args = self.parse_args()
