@@ -16,6 +16,37 @@ try:
 except NameError:
     pass
 
+# Just reimplement waitress.serve function to flush sys.stdout
+waitress_server = """
+import sys
+
+sys.path.append(r"{manage_path}")
+
+from waitress.server import create_server
+import logging
+
+def waitress_serve(app, **kw):
+    _server = kw.pop('_server', create_server) # test shim
+    _quiet = kw.pop('_quiet', False) # test shim
+    _profile = kw.pop('_profile', False) # test shim
+    if not _quiet: # pragma: no cover
+        # idempotent if logging has already been set up
+        logging.basicConfig()
+    server = _server(app, **kw)
+    if not _quiet: # pragma: no cover
+        sys.stdout.write('serving on http://%s:%s\\n' % (server.effective_host,
+                                                         server.effective_port))
+        sys.stdout.flush()
+    if _profile: # pragma: no cover
+        profile('server.run()', globals(), locals(), (), False)
+    else:
+        server.run()
+        
+from {wsgi_dir}.wsgi import application
+waitress_serve(application, host='127.0.0.1', port=0)
+
+"""
+    
     
 def user_input(msg, choices=None, quit='Q'):
     data = None
@@ -289,8 +320,11 @@ class ConfigScript():
             args['appName'] = user_input("   >> Application Name: ")
             
         if 'home' not in args:
-            home = user_input("   >> Home URL for application (http://127.0.0.1:8000<input>)")
-            args['home'] = 'http://127.0.0.1:8000' + home
+            home = user_input("   >> Home URL for application (default "/")")
+            hoem = home.replace('\\', '/')
+            if not home.startswith("/"):
+                home = '/' + home
+            args['home'] = home
         
         # WinPython
         print("Gathering input data for WinPython")
@@ -321,26 +355,13 @@ class ConfigScript():
         with open(run_py, 'w') as f:
             wsgi = find_file('wsgi.py', django.django_dir)[0]
             wsgi_paths = os.path.split(os.path.dirname(wsgi))
-            f.write("""
-import sys
-sys.path.append(r"{manage_path}")
-
-from waitress import serve
-from {wsgi_dir}.wsgi import application
-
-serve(application, host='127.0.0.1', port=8000)
-""".format(manage_path=os.path.dirname(django.manage_script), wsgi_dir=wsgi_paths[-1]))
+            f.write(waitress_server.format(manage_path=os.path.dirname(django.manage_script), wsgi_dir=wsgi_paths[-1]))
         
         # - run.py: file to run django using waitress (deploy)
         with open(os.path.abspath(os.path.join(base_path, 'deploy', 'run.py')), 'w') as f:
             wsgi = find_file('wsgi.py', django.django_dir)[0]
             wsgi_paths = os.path.split(os.path.dirname(wsgi))
-            f.write("""
-from waitress import serve
-from {wsgi_dir}.wsgi import application
-
-serve(application, host='127.0.0.1', port=8000)
-""".format(wsgi_dir=wsgi_paths[-1]))
+            f.write(waitress_server.format(manage_path='', wsgi_dir=wsgi_paths[-1]))
         
         # - requirements.txt: 
         with open(os.path.join(base_path, 'deploy', 'requirements.txt'), 'w') as f:

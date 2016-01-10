@@ -7,8 +7,6 @@
 #include "cefsimple/simple_app.h"
 #include "include/cef_sandbox_win.h"
 
-#include "local_server.h"
-
 
 // When generating projects with CMake the CEF_USE_SANDBOX value will be defined
 // automatically if using the required compiler version. Pass -DUSE_SANDBOX=OFF
@@ -68,14 +66,6 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
 
   // Initialize CEF.
   CefInitialize(main_args, settings, app.get(), sandbox_info);
-
-  // Run local server
-  CefRefPtr<LocalServer> instance(new LocalServer);
-  CefRefPtr<CefCommandLine> command_line =
-	  CefCommandLine::GetGlobalCommandLine();
-  std::string python = command_line->GetSwitchValue("python");
-  std::string manage = command_line->GetSwitchValue("manage");
-  instance->run_server(python, manage);
 
   // Run the CEF message loop. This will block until CefQuitMessageLoop() is
   // called.

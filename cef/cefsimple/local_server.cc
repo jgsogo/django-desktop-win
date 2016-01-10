@@ -13,19 +13,25 @@ LocalServer::~LocalServer() {
     this->stop_server();
 }
 
-void LocalServer::run_server(const std::string& python, const std::string& manage, bool persistent) {
-	_python = "\"" + python + "\"";
-	_manage = "\"" + manage + "\"";
+void LocalServer::cfg_server(const std::string& python, const std::string& manage, std::function<void(const std::string&)>& redirect_to) {
+	_redirect_to = redirect_to;
+	_python = python;
+	_manage = manage;
+}
+
+void LocalServer::run_server(bool persistent) {
     _thread = std::thread(&LocalServer::main, this, persistent);
 }
 
 void LocalServer::stop_server() {
     stop = true;
-    if (this->is_running()) {
-		//Poco::Process::requestTermination(_pid);
-        Poco::Process::kill(_pid);
-    }
-    _thread.join();
+	if (_pid != -1) {
+		if (this->is_running()) {
+			//Poco::Process::requestTermination(_pid);
+			Poco::Process::kill(_pid);
+		}
+		_thread.join();
+	}
 }
 
 bool LocalServer::is_running() const {
@@ -34,9 +40,9 @@ bool LocalServer::is_running() const {
 
 void LocalServer::main(bool persistent) {
 	// Run server (it will block execution)
-    std::string command = _python;
+    std::string command = "\"" + _python + "\"";;
     std::vector<std::string> args;
-	args.push_back(_manage);
+	args.push_back("\"" + _manage + "\"");
 	args.push_back("runserver");
 
     Poco::Pipe outPipe;
@@ -44,10 +50,12 @@ void LocalServer::main(bool persistent) {
     Poco::PipeInputStream istr(outPipe);
     _pid = handler.id();
 
-    while(!istr.eof()) {
-        std::string data;
+	while(!istr.eof()) {
+		std::string data;
         istr >> data;
-        std::cout << "OUTPUT: " << data << std::endl;
+		if (data.find("http://") != std::string::npos) {
+			_redirect_to(data);
+		}
     }
 
     handler.wait();

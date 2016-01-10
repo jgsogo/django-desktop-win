@@ -6,6 +6,7 @@
 #define CEF_TESTS_CEFSIMPLE_SIMPLE_APP_H_
 
 #include "include/cef_app.h"
+#include "local_server.h"
 
 class SimpleApp : public CefApp,
                   public CefBrowserProcessHandler {
@@ -19,7 +20,11 @@ class SimpleApp : public CefApp,
   // CefBrowserProcessHandler methods:
   virtual void OnContextInitialized() OVERRIDE;
 
+  void server_base(const std::string& base_url);
  private:
+	 LocalServer _server;
+	 std::string _home_url;
+
   // Include the default reference counting implementation.
   IMPLEMENT_REFCOUNTING(SimpleApp);
 };

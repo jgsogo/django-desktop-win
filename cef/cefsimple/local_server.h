@@ -1,15 +1,16 @@
 
 #pragma once
 
-#include "include/cef_base.h"
 #include <thread>
 #include <Poco/Process.h>
 
-class LocalServer : public CefBase {
+class LocalServer {
     public:
         LocalServer();
         ~LocalServer();
-        void run_server(const std::string& python, const std::string& manage, bool persistent=true);
+		void cfg_server(const std::string& python, const std::string& manage, std::function<void(const std::string&)>& redirect_to);
+        void run_server(bool persistent = true);
+
         void stop_server();
         bool is_running() const;
     private:
@@ -17,9 +18,10 @@ class LocalServer : public CefBase {
 
 		std::string _python;
 		std::string _manage;
+		std::function<void(const std::string&)> _redirect_to;
+
 		Poco::Process::PID _pid;
         std::thread _thread;
         bool stop;
-
-        IMPLEMENT_REFCOUNTING(LocalServer);
+        
 };
