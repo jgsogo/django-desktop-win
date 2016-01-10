@@ -536,8 +536,10 @@ set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CEF_LINKER_FLAGS_RELEASE} ${CEF_SHARED_
 # Find required packages: CEF, PoCo
 find_package(CEF)
 find_package(POCO)
+find_package(WinSparkle)
 include_directories(${CEF_INCLUDE_DIR})
 include_directories(${Poco_INCLUDE_DIRS})
+include_directories(${WinSparkle_INCLUDE_DIRS})
 
 #
 # Include target subdirectories.

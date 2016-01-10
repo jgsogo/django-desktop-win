@@ -48,7 +48,9 @@ Filename: {app}\bin\cefsimple.exe; Description: "Start {#MyAppName} after finish
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\bin\cefsimple.exe"; WorkingDir: "{app}"; Parameters: "--python=""{app}\{#WinPythonRelExe}"" --manage=""{app}\{#MyAppName}\{#ManagePyRelPath}\run.py"" --url={#Home}"; IconFilename: "{app}/bin/development.ico"
 Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
+Name: "{group}\Create superuser"; Filename: "{app}\{#WinPythonRelExe}"; WorkingDir: "{app}"; Parameters: """{app}\{#MyAppName}\{#ManagePyPath}"" createsuperuser"
 Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\bin\cefsimple.exe"; WorkingDir: "{app}"; Parameters: "--python=""{app}\{#WinPythonRelExe}"" --manage=""{app}\{#MyAppName}\{#ManagePyRelPath}\run.py"" --url={#Home}"; IconFilename: "{app}/bin/development.ico"
+
 
 [Code]
 procedure CurStepChanged(CurStep: TSetupStep);
