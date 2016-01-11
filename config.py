@@ -5,6 +5,9 @@ import sys
 import argparse
 import subprocess
 import glob
+import shutil
+
+from slugify import slugify
 
 try:
     from urllib.request import urlopen
@@ -16,6 +19,8 @@ try:
 except NameError:
     pass
 
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+    
 # Just reimplement waitress.serve function to flush sys.stdout
 waitress_server = """
 import sys
@@ -48,10 +53,14 @@ waitress_serve(application, host='127.0.0.1', port=0)
 """
     
     
-def user_input(msg, choices=None, quit='Q'):
+def user_input(msg, default=None, choices=None, quit='Q'):
     data = None
     while not data:
+        if default:
+            msg = msg + ' [%s]' % default
         input = raw_input(msg + ': ')
+        if not len(input):
+            input = default
         
         if input == quit:
             return None
@@ -198,19 +207,23 @@ class WinPythonConfig():
                 
     _on_cleanup = []
     
-    def install(self, filename, async=True):
+    def install(self, filename, target_dir, async=True):
         print("Installing WinPython, this can take a little...")
-        dirname = os.path.abspath(filename.rsplit('.',1)[0])
+        target_filename = os.path.join(target_dir, os.path.basename(filename))
+        dirname = os.path.dirname(target_filename)
+        
         if not self.find_exes(dirname):
-            install_process = subprocess.Popen([filename, '/S'])
+            shutil.copy2(filename, target_filename)
+            install_process = subprocess.Popen([target_filename, '/S'])
             
             def do_install():
                 print("Finishing WinPython installation")
                 install_process.communicate()
                 
                 # Look for python.exe and pip.exe
-                dirname = os.path.abspath(filename.rsplit('.',1)[0])
-                self.find_exes(dirname)            
+                self.find_exes(dirname)
+
+                os.remove(target_filename)
                 
             if async:
                 self._on_cleanup.append(do_install)
@@ -247,10 +260,12 @@ class WinPythonConfig():
 
 class DjangoConfig():
     django_dir = None
+    home = None
         
-    def __init__(self, django_dir, interactive=True):
+    def __init__(self, django_dir, home, interactive=True):
         self.interactive = interactive
         self.get_django_dir(django_dir)
+        self.get_home_url(home)
 
     def get_django_dir(self, django_dir):
         if django_dir:
@@ -266,8 +281,17 @@ class DjangoConfig():
         print(" - django_dir: %s" % self.django_dir)
         return self.django_dir
         
+    def get_home_url(self, home):
+        if not home:
+            home = user_input("   >> Home URL for application", default='/')
+            home = home.replace('\\', '/')
+            if not home.startswith("/"):
+                home = '/' + home
+        self.home = home
+        return self.home
+        
     def install(self):
-        print("Installing Django project and requirements, this can take a little...")
+        print("Looking for Django project files: manage.py and requirements...")
         
         # Look for 'manage.py' and 'requirements.py'
         manage_script = find_file('manage.py', self.django_dir)
@@ -281,90 +305,106 @@ class DjangoConfig():
         
         
 class ConfigScript():
-    iss_defines = {}
-    ini_file = 'config.ini'
+    app_id = None
+    cfg_filename = None
+    
+    def _get_cfg_filename(self, args):
+        filenames = []
+        if args['config_ini'] is not None:
+            filename, file_extension = os.path.splitext(args['config_ini'])
+            if file_extension:
+                return [os.path.abspath(args['config_ini'])]
+            return os.path.join(BASE_DIR, args['config_ini'], 'config.ini')
+        
+        return None
     
     def parse_args(self):
         parser = argparse.ArgumentParser(description='Configure django-desktop-win.')
+        parser.add_argument('config_ini', nargs='?', help='configuration file')
         parser.add_argument('--python', nargs='?', help='python version to work with: 2.7, 3.4,...')
         parser.add_argument('--arch', nargs='?', choices=['x64', 'x86'], help='target architecture (Win32)')
         parser.add_argument('--django_dir', nargs='?', help='Path to a self contained Django project')
         args = vars(parser.parse_args())
 
-        args = self.read_ini(os.path.dirname(__file__), args)
+        # Read data from config file
+        self.cfg_filename = self._get_cfg_filename(args)
+        if self.cfg_filename:
+            args = self.read_ini(args)
+            self.app_id = slugify(args['appName'])
+        else:
+            name_default = None
+            if 'django_dir' in args:
+                name_default = os.path.basename(args['django_dir'])
+            args['appName'] = user_input("   >> Application Name", default=name_default)
+            self.app_id = slugify(args['appName'])
+            dirpath = os.path.join(BASE_DIR, self.app_id)
+            if not os.path.exists(dirpath):
+                os.makedirs(dirpath)
+            self.cfg_filename = os.path.join(dirpath, 'config.ini')
+                
         return args
         
-    def save_ini(self, path, args):
-        with open(os.path.join(path, self.ini_file), 'w') as f:
+    def save_ini(self, args):
+        with open(self.cfg_filename, 'w') as f:
             for key, value in args.items():
                 if value is not None:
                     f.write('%s=%s\n' % (key, value))
         
-    def read_ini(self, path, args):        
-        try:
-            with open(os.path.join(path, self.ini_file), 'r') as f:
-                for line in f.readlines():
-                    if len(line.strip()):
-                        item = line.split('=')
-                        if item[0] not in args or args[item[0]] is None:
-                            args[item[0]] = item[1].strip()
-        except FileNotFoundError:
-            pass
+    def read_ini(self, args):
+        with open(self.cfg_filename, 'r') as f:
+            for line in f.readlines():
+                if len(line.strip()):
+                    item = line.split('=')
+                    if item[0] not in args or args[item[0]] is None:
+                        args[item[0]] = item[1].strip()
         return args
         
     def run(self, *args, **kwargs):
         args = self.parse_args()
-        base_path = os.path.dirname(__file__)
-        
-        if 'appName' not in args:
-            args['appName'] = user_input("   >> Application Name: ")
-            
-        if 'home' not in args:
-            home = user_input("   >> Home URL for application (default "/")")
-            hoem = home.replace('\\', '/')
-            if not home.startswith("/"):
-                home = '/' + home
-            args['home'] = home
-        
+                    
         # WinPython
         print("Gathering input data for WinPython")
         winpython = WinPythonConfig(args['python'], args['arch'])
-        filename = winpython.download_to(base_path)
-        winpython.install(filename, async=False)
         args['python'] = winpython.python_version
         args['arch'] = winpython.architecture
         
         # Django
         print("\nGathering input data for Django project")
-        django = DjangoConfig(args['django_dir'])
+        django = DjangoConfig(args['django_dir'], home=args.get('home', None))
         django.install()
         args['django_dir'] = django.django_dir
+
+        # Create stuff
+        # - config.ini: store configuration
+        self.save_ini(args)
+
+        # Perform actions
+        app_dir = os.path.dirname(self.cfg_filename)
+
+        filename = winpython.download_to(BASE_DIR)
+        winpython.install(filename, app_dir, async=False)
         
         if django.requirements_file:
             print("Installing requirements")
             winpython.run_python([winpython.pip_exe, 'install', '-r', django.requirements_file, '--upgrade'], async=False)
-            winpython.run_python([winpython.pip_exe, 'install', 'waitress'], async=False)
+            winpython.run_python([winpython.pip_exe, 'install', 'waitress', '--upgrade'], async=False)
             
                     
-        # Create stuff
-        # - config.ini: store configuration
-        self.save_ini(os.path.dirname(__file__), args)
-        
         # - run.py: file to run django using waitress (local)
-        run_py = os.path.abspath(os.path.join(base_path, 'run.py'))
+        run_py = os.path.abspath(os.path.join(app_dir, 'run.py'))
         with open(run_py, 'w') as f:
             wsgi = find_file('wsgi.py', django.django_dir)[0]
             wsgi_paths = os.path.split(os.path.dirname(wsgi))
             f.write(waitress_server.format(manage_path=os.path.dirname(django.manage_script), wsgi_dir=wsgi_paths[-1]))
         
         # - run.py: file to run django using waitress (deploy)
-        with open(os.path.abspath(os.path.join(base_path, 'deploy', 'run.py')), 'w') as f:
-            wsgi = find_file('wsgi.py', django.django_dir)[0]
-            wsgi_paths = os.path.split(os.path.dirname(wsgi))
-            f.write(waitress_server.format(manage_path='', wsgi_dir=wsgi_paths[-1]))
+        #with open(os.path.abspath(os.path.join(BASE_DIR, 'deploy', 'run.py')), 'w') as f:
+        #    wsgi = find_file('wsgi.py', django.django_dir)[0]
+        #    wsgi_paths = os.path.split(os.path.dirname(wsgi))
+        #    f.write(waitress_server.format(manage_path='', wsgi_dir=wsgi_paths[-1]))
         
         # - requirements.txt: 
-        with open(os.path.join(base_path, 'deploy', 'requirements.txt'), 'w') as f:
+        with open(os.path.join(app_dir, 'requirements.txt'), 'w') as f:
             waitress = False
             for line in open(django.requirements_file, 'r').readlines():
                 waitress = waitress or 'waitress' in line
@@ -372,21 +412,18 @@ class ConfigScript():
             if not waitress:
                 f.write('waitress')
         
-        # - start_server.bat: for local development
-        #with open(os.path.join(base_path, 'start_server.bat'), 'w') as f:
-        #    f.write('"%s" "%s" runserver' % (winpython.python_exe, django.manage_script))
-            
-        # - start_cef.bat: for local development (local)
-        deploy_dir = os.path.abspath(os.path.join(base_path, 'deploy', 'bin64' if args['arch'] == 'x64' else 'bin32'))
-        with open(os.path.join(base_path, 'start_cef.bat'), 'w') as f:
+        # - start.bat: start CEF, for local development (local)
+        deploy_dir = os.path.abspath(os.path.join(BASE_DIR, 'deploy', 'bin64' if args['arch'] == 'x64' else 'bin32'))
+        with open(os.path.join(app_dir, 'start.bat'), 'w') as f:
             cef_exe = find_file('cefsimple.exe', deploy_dir)
             if not len(cef_exe):
                 print("cefsimple.exe not found at '%s'. You have to compile CEF and call config again." % deploy_dir)
             else:
-                f.write('"%s" --python="%s" --manage="%s" --url=%s' % (cef_exe[0], winpython.python_exe, run_py, args['home']))
-            
+                f.write('"%s" --python="%s" --manage="%s" --url=%s' % (cef_exe[0], winpython.python_exe, run_py, django.home))
+        
+        """        
         # - defines.iss
-        with open(os.path.join(base_path, 'defines.iss'), 'w') as f:
+        with open(os.path.join(BASE_DIR, 'defines.iss'), 'w') as f:
             f.write('#define MyAppName "%s"\n' % args['appName'])
             f.write('#define Architecture "%s"\n' % args['arch'])
             f.write('#define DeployDir "%s"\n' % deploy_dir)
@@ -398,14 +435,14 @@ class ConfigScript():
             f.write('#define WinPythonBasename "%s"\n' % winpython.basename)
             f.write('#define WinPythonDownload "%s"\n' % winpython.download_url)
             
-            f.write('#define WinPythonRelPath "%s"\n' % os.path.relpath(os.path.dirname(winpython.python_exe), base_path))
-            f.write('#define WinPythonRelExe "%s"\n' % os.path.relpath(winpython.python_exe, base_path))
-            f.write('#define WinPythonPipRelPath "%s"\n' % os.path.relpath(winpython.pip_exe, base_path))
-            f.write('#define WinPythonEnvRelPath "%s"\n' % os.path.relpath(winpython.env_bat, base_path))
+            f.write('#define WinPythonRelPath "%s"\n' % os.path.relpath(os.path.dirname(winpython.python_exe), BASE_DIR))
+            f.write('#define WinPythonRelExe "%s"\n' % os.path.relpath(winpython.python_exe, BASE_DIR))
+            f.write('#define WinPythonPipRelPath "%s"\n' % os.path.relpath(winpython.pip_exe, BASE_DIR))
+            f.write('#define WinPythonEnvRelPath "%s"\n' % os.path.relpath(winpython.env_bat, BASE_DIR))
             
             f.write('#define ManagePyPath "%s"\n' % os.path.relpath(django.manage_script, django.django_dir))
             f.write('#define ManagePyRelPath "%s"\n' % os.path.relpath(os.path.dirname(django.manage_script), django.django_dir))
-
+        """
 
         
 if __name__ == '__main__':
