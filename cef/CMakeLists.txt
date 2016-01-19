@@ -539,7 +539,10 @@ find_package(POCO)
 find_package(WinSparkle)
 include_directories(${CEF_INCLUDE_DIR})
 include_directories(${Poco_INCLUDE_DIRS})
-include_directories(${WinSparkle_INCLUDE_DIRS})
+if(${WinSparkle_FOUND})
+    add_definitions(-DWINSPARKLE)
+    include_directories(${WinSparkle_INCLUDE_DIRS})
+endif()
 
 #
 # Include target subdirectories.

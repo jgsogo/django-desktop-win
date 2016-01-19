@@ -36,3 +36,8 @@ find_library(WinSparkle_LIBRARIES
 
 set(WinSparkle_RUNTIME_LIBRARIES "WinSparkle.dll")
 
+if(${WinSparkle_LIBRARIES} AND ${WinSparkle_INCLUDE_DIRS})
+    set(WinSparkle_FOUND 1)
+else()
+    set(WinSparkle_FOUND 0)
+endif()

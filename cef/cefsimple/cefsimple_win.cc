@@ -4,7 +4,9 @@
 
 #include <windows.h>
 
-#include "winsparkle.h"
+#ifdef WINSPARKLE
+    #include "winsparkle.h"
+#endif
 
 #include "cefsimple/simple_app.h"
 #include "include/cef_sandbox_win.h"
@@ -43,9 +45,11 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   sandbox_info = scoped_sandbox.sandbox_info();
 #endif
 
+#ifdef WINSPARKLE
   win_sparkle_set_app_details(L"jgsogo", L"cefsimple", L"0.1");
   win_sparkle_set_appcast_url("https://dl.dropboxusercontent.com/u/4103427/TestCEFDjango/TestCEFDjango.xml");
   win_sparkle_init();
+#endif
 
   // Provide CEF with command-line arguments.
   CefMainArgs main_args(hInstance);
@@ -80,7 +84,9 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   // Shut down CEF.
   CefShutdown();
 
+#ifdef WINSPARKLE
   win_sparkle_cleanup();
+#endif
 
   return 0;
 }

@@ -181,7 +181,11 @@ if(OS_WINDOWS)
   # Executable target.
   add_executable(${CEF_TARGET} WIN32 ${CEFSIMPLE_SRCS})
   #add_dependencies(${CEF_TARGET} libcef_dll_wrapper)
-  target_link_libraries(${CEF_TARGET} libcef_lib libcef_dll_wrapper ${CEF_STANDARD_LIBS} ${Poco_LIBRARIES} ${WinSparkle_LIBRARIES})
+  target_link_libraries(${CEF_TARGET} libcef_lib libcef_dll_wrapper ${CEF_STANDARD_LIBS} ${Poco_LIBRARIES})
+  if(${WinSparkle_FOUND})
+    target_link_libraries(${CEF_TARGET} ${WinSparkle_LIBRARIES})
+  endif()
+
 
   if(USE_SANDBOX)
     # Logical target used to link the cef_sandbox library.
@@ -201,4 +205,6 @@ install(TARGETS ${CEF_TARGET} DESTINATION ${CEF_INSTALL_DIR})
 # Copy CEF binary and resource files to the target output directory.
 COPY_FILES("${CEF_TARGET}" "${CEF_BINARY_FILES}" "${CEF_BINARY_DIR}" "${CEF_INSTALL_DIR}")
 COPY_FILES("${CEF_TARGET}" "${CEF_RESOURCE_FILES}" "${CEF_RESOURCE_DIR}" "${CEF_INSTALL_DIR}")
+if(${WinSparkle_FOUND})
 COPY_FILES("${CEF_TARGET}" "${WinSparkle_RUNTIME_LIBRARIES}" "${WinSparkle_ROOT_DIR}/${WinSparkle_RUNTIME_DIR}" "${CEF_INSTALL_DIR}")
+endif()

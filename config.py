@@ -1,4 +1,6 @@
 
+from __future__ import unicode_literals
+
 import re
 import os
 import sys
@@ -9,16 +11,24 @@ import shutil
 
 from slugify import slugify
 
+# Python 2 vs 3 conditional imports and auxiliary functions
 try:
     from urllib.request import urlopen
 except ImportError:
     from urllib2 import urlopen
 
-try:
+if sys.version_info < (3,):
+    import codecs
+    def u(x):
+        return codecs.unicode_escape_decode(x)[0]
+else:
     raw_input = input
-except NameError:
-    pass
+    def u(x):
+        return x
 
+
+# Actual code
+    
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
     
 # Just reimplement waitress.serve function to flush sys.stdout
@@ -58,7 +68,8 @@ def user_input(msg, default=None, choices=None, quit='Q'):
     while not data:
         if default:
             msg = msg + ' [%s]' % default
-        input = raw_input(msg + ': ')
+        r = raw_input(msg + ': ')
+        input = u(r.replace('\\', '/'))
         if not len(input):
             input = default
         
@@ -173,7 +184,7 @@ class WinPythonConfig():
             else:
                 raise ValueError("Architecture '%s' not recognized" % architecture)
             pattern = self.regex_name.format(architecture=arch, python_version=self.python_version)
-        
+            
             m = [re.search(pattern, str(line), re.IGNORECASE) for line in urlopen(self.MD5_SHA1_FILE).readlines()]
             m = [x for x in m if x is not None]
             if not len(m):
@@ -333,7 +344,7 @@ class ConfigScript():
             self.app_id = slugify(args['appName'])
         else:
             name_default = None
-            if 'django_dir' in args:
+            if args['django_dir'] is not None:
                 name_default = os.path.basename(args['django_dir'])
             args['appName'] = user_input("   >> Application Name", default=name_default)
             self.app_id = slugify(args['appName'])
