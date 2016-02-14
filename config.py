@@ -189,15 +189,14 @@ class WinPythonConfig():
             m = [x for x in m if x is not None]
             if not len(m):
                 raise ValueError("Cannot find a WinPython version for architecture '%s' and Python '%s'" % (self.architecture, self.python_version))
-            if len(m) > 1:
-                raise ValueError("More than one WinPython matches requested version: '%s'" % "', '".join([it.group(0) for it in m]))
-
+            item = max(m, key=lambda u: (u.group(1), u.group(2)))
+            
             # Keep cases
             basename = self.regex_name.format(architecture=arch, python_version=self.python_version)
-            basename = basename.replace('(\d)', m[0].group(1), 1)
-            basename = basename.replace('(\d)', m[0].group(2), 1)
+            basename = basename.replace('(\d)', item.group(1), 1)
+            basename = basename.replace('(\d)', item.group(2), 1)
             setattr(self, '_basename', basename)
-            setattr(self, '_winpython_version', "%s.%s.%s" % (self.python_version, m[0].group(1), m[0].group(2)))
+            setattr(self, '_winpython_version', "%s.%s.%s" % (self.python_version, item.group(1), item.group(2)))
         return getattr(self, '_basename')
             
     @property
@@ -384,6 +383,7 @@ class ConfigScript():
         django = DjangoConfig(args['django_dir'], home=args.get('home', None))
         django.install()
         args['django_dir'] = django.django_dir
+        args['home'] = django.home
 
         # Create stuff
         # - config.ini: store configuration
@@ -432,9 +432,8 @@ class ConfigScript():
             else:
                 f.write('"%s" --python="%s" --manage="%s" --url=%s' % (cef_exe[0], winpython.python_exe, run_py, django.home))
         
-        """        
         # - defines.iss
-        with open(os.path.join(BASE_DIR, 'defines.iss'), 'w') as f:
+        with open(os.path.join(app_dir, 'defines.iss'), 'w') as f:
             f.write('#define MyAppName "%s"\n' % args['appName'])
             f.write('#define Architecture "%s"\n' % args['arch'])
             f.write('#define DeployDir "%s"\n' % deploy_dir)
@@ -446,14 +445,13 @@ class ConfigScript():
             f.write('#define WinPythonBasename "%s"\n' % winpython.basename)
             f.write('#define WinPythonDownload "%s"\n' % winpython.download_url)
             
-            f.write('#define WinPythonRelPath "%s"\n' % os.path.relpath(os.path.dirname(winpython.python_exe), BASE_DIR))
-            f.write('#define WinPythonRelExe "%s"\n' % os.path.relpath(winpython.python_exe, BASE_DIR))
-            f.write('#define WinPythonPipRelPath "%s"\n' % os.path.relpath(winpython.pip_exe, BASE_DIR))
-            f.write('#define WinPythonEnvRelPath "%s"\n' % os.path.relpath(winpython.env_bat, BASE_DIR))
+            f.write('#define WinPythonRelPath "%s"\n' % os.path.relpath(os.path.dirname(winpython.python_exe), app_dir))
+            f.write('#define WinPythonRelExe "%s"\n' % os.path.relpath(winpython.python_exe, app_dir))
+            f.write('#define WinPythonPipRelPath "%s"\n' % os.path.relpath(winpython.pip_exe, app_dir))
+            f.write('#define WinPythonEnvRelPath "%s"\n' % os.path.relpath(winpython.env_bat, app_dir))
             
             f.write('#define ManagePyPath "%s"\n' % os.path.relpath(django.manage_script, django.django_dir))
             f.write('#define ManagePyRelPath "%s"\n' % os.path.relpath(os.path.dirname(django.manage_script), django.django_dir))
-        """
 
         
 if __name__ == '__main__':

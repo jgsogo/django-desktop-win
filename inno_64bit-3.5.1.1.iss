@@ -1,5 +1,7 @@
 
-#include "defines.iss"
+#define AppDir "neutron"
+
+#include AppDir + "/defines.iss"
 
 #define MyAppVersion "1.5"
 #define MyAppPublisher "My Company, Inc."
@@ -29,14 +31,13 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
 Source: "{#DeployDir}/*"; DestDir: "{app}/bin"; Flags: ignoreversion recursesubdirs createallsubdirs; Permissions: users-modify
-Source: "{#DjangoDir}/*"; Excludes: "*.~*,*.pyc,*.sqlite3"; DestDir: "{app}/{#MyAppName}"; Components: {#MyAppName}; Flags: ignoreversion recursesubdirs createallsubdirs; Permissions: users-modify
-Source: "./deploy/requirements.txt"; DestDir: "{app}/tmp"; Components: {#MyAppName}; Flags: ignoreversion
-Source: "./deploy/run.py"; DestDir: "{app}/{#MyAppName}/{#ManagePyRelPath}"; Components: {#MyAppName}; Flags: ignoreversion
+Source: "{#DjangoDir}/*"; Excludes: "*.~*,*.pyc,*.log"; DestDir: "{app}/{#MyAppName}"; Components: {#MyAppName}; Flags: ignoreversion recursesubdirs createallsubdirs; Permissions: users-modify
+Source: "{#AppDir}/requirements.txt"; DestDir: "{app}/tmp"; Components: {#MyAppName}; Flags: ignoreversion
+Source: "{#AppDir}/run.py"; DestDir: "{app}/{#MyAppName}/{#ManagePyRelPath}"; Components: {#MyAppName}; Flags: ignoreversion
 Source: "./cef/cefsimple/res/development.ico"; DestDir: "{app}/bin"
-Source: "{#WinPythonBasename}/*"; Excludes: "*.~*,*.pyc"; DestDir: "{app}/{#WinPythonBasename}"; Components: {#MyAppName}; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#AppDir}/{#WinPythonBasename}/*"; Excludes: "*.~*,*.pyc"; DestDir: "{app}/{#WinPythonBasename}"; Components: {#MyAppName}; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]
-Name: "{app}/{#MyAppName}"; Permissions: everyone-full
 
 [Components]
 Name: "winpython"; Description: "WinPython {#PythonVersion} {#WinPythonArchitecture}"; Types: full compact custom; Flags: fixed
