@@ -459,6 +459,13 @@ class ConfigScript():
             f.write('#include "%s"\n' % defines_filename)
             f.write('#include "../../inno_setup.tmp.iss"\n')
         
+        # - CMakeLists.txt
+        with open(os.path.join(app_dir, 'CMakeLists.txt'), 'w') as f:
+            f.write('cmake_minimum_required(VERSION 2.8)\n')
+            f.write('set(PROJECT_NAME, "%s")\n' % args['appName'])
+            f.write('include(${CMAKE_CURRENT_SOURCE_DIR}/../../cef/CMakeLists.txt)\n')
+        
+        
         
 if __name__ == '__main__':
     script = ConfigScript()

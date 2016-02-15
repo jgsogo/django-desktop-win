@@ -165,7 +165,7 @@ if(NOT CMAKE_BUILD_TYPE AND
 endif()
 
 # Include cmake macros.
-set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}")
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}" "${CMAKE_CURRENT_LIST_DIR}/")
 include("macros")
 
 # Source include directory.
