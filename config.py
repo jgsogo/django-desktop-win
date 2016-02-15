@@ -433,7 +433,10 @@ class ConfigScript():
                 f.write('"%s" --python="%s" --manage="%s" --url=%s' % (cef_exe[0], winpython.python_exe, run_py, django.home))
         
         # - defines.iss
-        with open(os.path.join(app_dir, 'defines.iss'), 'w') as f:
+        defines_filename = 'defines_py%s_%s.iss' % (winpython.python_version, args['arch'])
+        with open(os.path.join(app_dir, defines_filename), 'w') as f:
+            f.write('#define MainDir "%s"\n' % BASE_DIR)
+            f.write('#define AppDir "%s"\n' % app_dir)
             f.write('#define MyAppName "%s"\n' % args['appName'])
             f.write('#define Architecture "%s"\n' % args['arch'])
             f.write('#define DeployDir "%s"\n' % deploy_dir)
@@ -453,6 +456,11 @@ class ConfigScript():
             f.write('#define ManagePyPath "%s"\n' % os.path.relpath(django.manage_script, django.django_dir))
             f.write('#define ManagePyRelPath "%s"\n' % os.path.relpath(os.path.dirname(django.manage_script), django.django_dir))
 
+        # - inno_setup.tmp.iss
+        with open(os.path.join(app_dir, '%s_py%s_%s.iss' % (args['appName'], winpython.python_version, args['arch'])), 'w') as f:
+            f.write('#include "%s"\n' % defines_filename)
+            f.write('#include "../inno_setup.tmp.iss"\n')
+        
         
 if __name__ == '__main__':
     script = ConfigScript()

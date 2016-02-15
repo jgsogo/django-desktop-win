@@ -1,7 +1,5 @@
 
-#define AppDir "neutron"
-
-#include AppDir + "/defines.iss"
+;#include "defines.iss"
 
 #define MyAppVersion "1.5"
 #define MyAppPublisher "My Company, Inc."
@@ -34,7 +32,7 @@ Source: "{#DeployDir}/*"; DestDir: "{app}/bin"; Flags: ignoreversion recursesubd
 Source: "{#DjangoDir}/*"; Excludes: "*.~*,*.pyc,*.log"; DestDir: "{app}/{#MyAppName}"; Components: {#MyAppName}; Flags: ignoreversion recursesubdirs createallsubdirs; Permissions: users-modify
 Source: "{#AppDir}/requirements.txt"; DestDir: "{app}/tmp"; Components: {#MyAppName}; Flags: ignoreversion
 Source: "{#AppDir}/run.py"; DestDir: "{app}/{#MyAppName}/{#ManagePyRelPath}"; Components: {#MyAppName}; Flags: ignoreversion
-Source: "./cef/cefsimple/res/development.ico"; DestDir: "{app}/bin"
+Source: "{#MainDir}/cef/cefsimple/res/development.ico"; DestDir: "{app}/bin"
 Source: "{#AppDir}/{#WinPythonBasename}/*"; Excludes: "*.~*,*.pyc"; DestDir: "{app}/{#WinPythonBasename}"; Components: {#MyAppName}; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]
