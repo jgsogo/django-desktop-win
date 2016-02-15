@@ -30,6 +30,8 @@ else:
 # Actual code
     
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+DOWNLOAD_PATH = os.path.join(BASE_DIR, 'tmp')
+PROJECTS_PATH = os.path.join(BASE_DIR, 'projects')
     
 # Just reimplement waitress.serve function to flush sys.stdout
 waitress_server = """
@@ -211,6 +213,8 @@ class WinPythonConfig():
                                         basename=self.basename)
             
     def download_to(self, path):
+        if not os.path.exists(path):
+            os.makedirs(path)
         filename = os.path.join(path, self.basename + '.exe')
         download(self.download_url, filename)        
         return filename
@@ -323,8 +327,8 @@ class ConfigScript():
         if args['config_ini'] is not None:
             filename, file_extension = os.path.splitext(args['config_ini'])
             if file_extension:
-                return [os.path.abspath(args['config_ini'])]
-            return os.path.join(BASE_DIR, args['config_ini'], 'config.ini')
+                return os.path.abspath(args['config_ini'])
+            return os.path.join(PROJECTS_PATH, args['config_ini'], 'config.ini')
         
         return None
     
@@ -347,7 +351,7 @@ class ConfigScript():
                 name_default = os.path.basename(args['django_dir'])
             args['appName'] = user_input("   >> Application Name", default=name_default)
             self.app_id = slugify(args['appName'])
-            dirpath = os.path.join(BASE_DIR, self.app_id)
+            dirpath = os.path.join(PROJECTS_PATH, self.app_id)
             if not os.path.exists(dirpath):
                 os.makedirs(dirpath)
             self.cfg_filename = os.path.join(dirpath, 'config.ini')
@@ -392,7 +396,7 @@ class ConfigScript():
         # Perform actions
         app_dir = os.path.dirname(self.cfg_filename)
 
-        filename = winpython.download_to(BASE_DIR)
+        filename = winpython.download_to(DOWNLOAD_PATH)
         winpython.install(filename, app_dir, async=False)
         
         if django.requirements_file:
@@ -408,12 +412,6 @@ class ConfigScript():
             wsgi_paths = os.path.split(os.path.dirname(wsgi))
             f.write(waitress_server.format(manage_path=os.path.dirname(django.manage_script), wsgi_dir=wsgi_paths[-1]))
         
-        # - run.py: file to run django using waitress (deploy)
-        #with open(os.path.abspath(os.path.join(BASE_DIR, 'deploy', 'run.py')), 'w') as f:
-        #    wsgi = find_file('wsgi.py', django.django_dir)[0]
-        #    wsgi_paths = os.path.split(os.path.dirname(wsgi))
-        #    f.write(waitress_server.format(manage_path='', wsgi_dir=wsgi_paths[-1]))
-        
         # - requirements.txt: 
         with open(os.path.join(app_dir, 'requirements.txt'), 'w') as f:
             waitress = False
@@ -424,7 +422,7 @@ class ConfigScript():
                 f.write('waitress')
         
         # - start.bat: start CEF, for local development (local)
-        deploy_dir = os.path.abspath(os.path.join(BASE_DIR, 'deploy', 'bin64' if args['arch'] == 'x64' else 'bin32'))
+        deploy_dir = os.path.abspath(os.path.join(PROJECTS_PATH, 'deploy', 'bin64' if args['arch'] == 'x64' else 'bin32'))
         with open(os.path.join(app_dir, 'start.bat'), 'w') as f:
             cef_exe = find_file('cefsimple.exe', deploy_dir)
             if not len(cef_exe):
@@ -435,7 +433,7 @@ class ConfigScript():
         # - defines.iss
         defines_filename = 'defines_py%s_%s.iss' % (winpython.python_version, args['arch'])
         with open(os.path.join(app_dir, defines_filename), 'w') as f:
-            f.write('#define MainDir "%s"\n' % BASE_DIR)
+            f.write('#define MainDir "%s"\n' % PROJECTS_PATH)
             f.write('#define AppDir "%s"\n' % app_dir)
             f.write('#define MyAppName "%s"\n' % args['appName'])
             f.write('#define Architecture "%s"\n' % args['arch'])
@@ -459,7 +457,7 @@ class ConfigScript():
         # - inno_setup.tmp.iss
         with open(os.path.join(app_dir, '%s_py%s_%s.iss' % (args['appName'], winpython.python_version, args['arch'])), 'w') as f:
             f.write('#include "%s"\n' % defines_filename)
-            f.write('#include "../inno_setup.tmp.iss"\n')
+            f.write('#include "../../inno_setup.tmp.iss"\n')
         
         
 if __name__ == '__main__':
